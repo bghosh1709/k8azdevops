@@ -1,0 +1,70 @@
+# Docker
+# Build a Docker image 
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- master
+
+resources:
+- repo: self
+
+variables:
+  tag: '$(Build.BuildId)'
+  
+stages:
+- stage: Build
+  displayName: Build image
+  jobs:  
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: DotNetCoreInstaller@0
+      inputs:
+        version: '2.2.101'
+        
+    - task: SonarQubePrepare@4
+      inputs:
+        SonarQube: 'AzureSonar'
+        scannerMode: 'CLI'
+        configMode: 'manual'
+        cliProjectKey: 'AZDevops_Demo'
+        cliProjectName: 'AZDevops_Demo'
+        cliSources: 'aspnet-core-dotnet-core'
+    - task: DotNetCoreCLI@2
+      displayName: Build
+      inputs:
+        command: 'build'
+        projects: '**/*.csproj'
+    - task: DotNetCoreCLI@2
+      displayName: Test
+      inputs:
+        command: 'test'
+        projects: 'aspnet-core-dotnet-core.UnitTests/*.csproj'
+    - task: DotNetCoreCLI@2
+      displayName: Publish
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: '**/*.csproj'
+        arguments: '-o=aspnet-core-dotnet-core/build'
+        zipAfterPublish: false
+    
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'aspnet-core-dotnet-core/aspnet-core-dotnet-core/build'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+    - task: SonarQubeAnalyze@4
+      displayName: Code Analysis
+    - task: Docker@2
+      displayName: Build an image
+      inputs:
+        containerRegistry: 'AzureRegistry'
+        repository: 'dotnet-core-demo'
+        command: 'buildAndPush'
+        Dockerfile: '**/Dockerfile'
+        tags: |
+          $(Build.BuildId)
+          latest

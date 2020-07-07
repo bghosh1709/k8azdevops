@@ -1,0 +1,2 @@
+Test file
+<run the test pipeline for AzureDemo>
